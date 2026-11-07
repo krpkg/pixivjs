@@ -1,0 +1,32 @@
+{
+  "name": "pixivjs",
+  "version": "1.0.0",
+  "description": "Lightweight, universal TypeScript client and SDK for Pixiv artwork metadata and downloads",
+  "license": "Apache-2.0",
+  "author": "",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "tsup": "^8.3.6",
+    "typescript": "^5.8.2"
+  }
+}
