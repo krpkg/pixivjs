@@ -32,10 +32,12 @@ export function extractIllustId(input: string | number): string | null {
     return illustMatch[1];
   }
 
-  // 4. Any standalone sequence of 7 to 10 digits inside url-like strings
-  const fallbackDigits = trimmed.match(/https?:\/\/[^\s]+(\d{7,10})/);
-  if (fallbackDigits) {
-    return fallbackDigits[1];
+  // 4. Fallback digits inside verified pixiv/pximg domains
+  const pixivDomainFallback = trimmed.match(
+    /https?:\/\/(?:[a-zA-Z0-9_-]+\.)?(?:pixiv\.(?:net|me)|pximg\.net)\/[^\s]*?(\d{7,10})/i
+  );
+  if (pixivDomainFallback) {
+    return pixivDomainFallback[1];
   }
 
   return null;
@@ -64,4 +66,11 @@ export function isPixivCdnUrl(urlStr: string): boolean {
  */
 export function sanitizeFilename(name: string): string {
   return name.replace(/[\\/:*?"<>|]/g, '_').trim() || 'pixiv_artwork';
+}
+
+/**
+ * Async sleep utility for retry intervals.
+ */
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

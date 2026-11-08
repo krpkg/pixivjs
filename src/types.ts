@@ -19,6 +19,18 @@ export interface PixivTag {
   };
 }
 
+export interface UgoiraFrame {
+  file: string;
+  delay: number;
+}
+
+export interface UgoiraMeta {
+  src: string;
+  originalSrc: string;
+  mime_type: string;
+  frames: UgoiraFrame[];
+}
+
 export interface ArtworkData {
   id: string;
   title: string;
@@ -68,6 +80,14 @@ export interface ClientOptions {
    * Custom referer. Defaults to "https://www.pixiv.net/"
    */
   referer?: string;
+  /**
+   * Maximum retry attempts for transient network or rate-limiting errors. Defaults to 0.
+   */
+  retries?: number;
+  /**
+   * Delay in milliseconds between retries. Defaults to 1000.
+   */
+  retryDelay?: number;
 }
 
 export interface DownloadProgress {

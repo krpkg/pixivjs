@@ -24,9 +24,14 @@ describe('extractIllustId', () => {
     expect(extractIllustId(text)).toBe('151772434');
   });
 
-  it('returns null for invalid inputs', () => {
+  it('extracts from pixiv.me short links', () => {
+    expect(extractIllustId('https://pixiv.me/art/151772434')).toBe('151772434');
+  });
+
+  it('returns null for invalid or third-party URL inputs with digits', () => {
     expect(extractIllustId('')).toBeNull();
     expect(extractIllustId('not-a-pixiv-id')).toBeNull();
+    expect(extractIllustId('https://example.com/post/12345678')).toBeNull();
   });
 });
 

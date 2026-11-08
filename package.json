@@ -1,9 +1,23 @@
 {
   "name": "@krpkg/pixivjs",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Lightweight, universal TypeScript client and SDK for Pixiv artwork metadata and downloads",
   "license": "Apache-2.0",
   "author": "krpkg",
+  "keywords": [
+    "pixiv",
+    "pixiv-api",
+    "pixiv-downloader",
+    "artwork",
+    "ugoira",
+    "pximg",
+    "typescript",
+    "sdk"
+  ],
+  "homepage": "https://github.com/krpkg/pixivjs#readme",
+  "bugs": {
+    "url": "https://github.com/krpkg/pixivjs/issues"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/krpkg/pixivjs.git"
@@ -16,6 +30,16 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.mjs",
+      "require": "./dist/utils.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.mjs",
+      "require": "./dist/errors.js"
     }
   },
   "files": [

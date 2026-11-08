@@ -4,9 +4,17 @@ import type {
   DownloadZipOptions,
   DownloadProgress,
   PixivPage,
+  UgoiraMeta,
 } from './types';
-import { extractIllustId, isPixivCdnUrl, sanitizeFilename } from './utils';
-import JSZip from 'jszip';
+import { extractIllustId, isPixivCdnUrl, sanitizeFilename, sleep } from './utils';
+import {
+  PixivValidationError,
+  PixivNotFoundError,
+  PixivRateLimitError,
+  PixivAuthError,
+  PixivApiError,
+  PixivDownloadError,
+} from './errors';
 
 export class PixivClient {
   private baseUrl: string;
@@ -14,6 +22,8 @@ export class PixivClient {
   private userAgent: string;
   private cookie?: string;
   private referer: string;
+  private retries: number;
+  private retryDelay: number;
 
   constructor(options: ClientOptions = {}) {
     this.baseUrl = (options.baseUrl || 'https://www.pixiv.net').replace(/\/+$/, '');
@@ -27,6 +37,8 @@ export class PixivClient {
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
     this.cookie = options.cookie;
     this.referer = options.referer || 'https://www.pixiv.net/';
+    this.retries = options.retries ?? 0;
+    this.retryDelay = options.retryDelay ?? 1000;
   }
 
   /**
@@ -49,31 +61,74 @@ export class PixivClient {
   }
 
   /**
+   * Internal fetch with retries for transient errors (429, 502, 503, 504, network drops)
+   */
+  private async request(
+    url: string,
+    options: RequestInit = {},
+    customRetries = this.retries
+  ): Promise<Response> {
+    let attempts = 0;
+    while (true) {
+      try {
+        const response = await this.fetchFn(url, options);
+
+        // Check if rate limited or transient server error and retry if attempts remain
+        if (
+          (response.status === 429 || (response.status >= 500 && response.status <= 504)) &&
+          attempts < customRetries
+        ) {
+          attempts++;
+          await sleep(this.retryDelay * attempts);
+          continue;
+        }
+
+        return response;
+      } catch (err) {
+        if (attempts < customRetries) {
+          attempts++;
+          await sleep(this.retryDelay * attempts);
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
+  /**
    * Fetches metadata for an artwork by URL, full link, or ID.
    */
   async getArtwork(input: string | number): Promise<ArtworkData> {
     const illustId = extractIllustId(input);
     if (!illustId) {
-      throw new Error(`Invalid Pixiv artwork ID or URL: "${input}"`);
+      throw new PixivValidationError(`Invalid Pixiv artwork ID or URL: "${input}"`);
     }
 
     const url = `${this.baseUrl}/ajax/illust/${illustId}`;
-    const response = await this.fetchFn(url, {
+    const response = await this.request(url, {
       method: 'GET',
       headers: this.getHeaders(),
     });
 
     if (response.status === 404) {
-      throw new Error(`Artwork ${illustId} not found or has been deleted.`);
+      throw new PixivNotFoundError(illustId);
     }
-
+    if (response.status === 429) {
+      throw new PixivRateLimitError();
+    }
+    if (response.status === 403) {
+      throw new PixivAuthError();
+    }
     if (!response.ok) {
-      throw new Error(`Pixiv API responded with status ${response.status}`);
+      throw new PixivApiError(`Pixiv API responded with status ${response.status}`, response.status);
     }
 
     const json: any = await response.json();
     if (json.error) {
-      throw new Error(json.message || `Failed to fetch artwork from Pixiv (ID: ${illustId})`);
+      throw new PixivApiError(
+        json.message || `Failed to fetch artwork from Pixiv (ID: ${illustId})`,
+        response.status
+      );
     }
 
     const body = json.body;
@@ -82,7 +137,7 @@ export class PixivClient {
     // 1. Try standard desktop pages endpoint
     try {
       const pagesUrl = `${this.baseUrl}/ajax/illust/${illustId}/pages`;
-      const pagesRes = await this.fetchFn(pagesUrl, {
+      const pagesRes = await this.request(pagesUrl, {
         method: 'GET',
         headers: this.getHeaders(),
       });
@@ -93,7 +148,7 @@ export class PixivClient {
           pages = pagesJson.body;
         }
       }
-    } catch (err) {
+    } catch {
       // Desktop pages fetch failed, proceed to fallback
     }
 
@@ -104,7 +159,7 @@ export class PixivClient {
     if (!desktopHasValidUrls) {
       try {
         const touchUrl = `${this.baseUrl}/touch/ajax/illust/details?illust_id=${illustId}`;
-        const touchRes = await this.fetchFn(touchUrl, {
+        const touchRes = await this.request(touchUrl, {
           method: 'GET',
           headers: this.getHeaders(),
         });
@@ -139,7 +194,7 @@ export class PixivClient {
             }
           }
         }
-      } catch (touchErr) {
+      } catch {
         // Fallback failed
       }
     }
@@ -181,15 +236,59 @@ export class PixivClient {
   }
 
   /**
+   * Fetches ugoira animation frames and metadata for an artwork.
+   */
+  async getUgoiraMeta(input: string | number): Promise<UgoiraMeta> {
+    const illustId = extractIllustId(input);
+    if (!illustId) {
+      throw new PixivValidationError(`Invalid Pixiv artwork ID or URL: "${input}"`);
+    }
+
+    const url = `${this.baseUrl}/ajax/illust/${illustId}/ugoira_meta`;
+    const response = await this.request(url, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    if (response.status === 404) {
+      throw new PixivNotFoundError(illustId);
+    }
+    if (response.status === 429) {
+      throw new PixivRateLimitError();
+    }
+    if (response.status === 403) {
+      throw new PixivAuthError();
+    }
+    if (!response.ok) {
+      throw new PixivApiError(`Pixiv API responded with status ${response.status}`, response.status);
+    }
+
+    const json: any = await response.json();
+    if (json.error || !json.body) {
+      throw new PixivApiError(
+        json.message || `No ugoira metadata found for artwork ID ${illustId}`,
+        response.status
+      );
+    }
+
+    return {
+      src: json.body.src,
+      originalSrc: json.body.originalSrc,
+      mime_type: json.body.mime_type,
+      frames: json.body.frames || [],
+    };
+  }
+
+  /**
    * Downloads an image from Pixiv CDN (i.pximg.net) with valid Referer headers.
    * Returns an ArrayBuffer and response metadata.
    */
   async fetchImage(imageUrl: string, signal?: AbortSignal): Promise<{ data: ArrayBuffer; contentType: string }> {
     if (!isPixivCdnUrl(imageUrl)) {
-      throw new Error(`Untrusted Pixiv CDN image URL: "${imageUrl}"`);
+      throw new PixivValidationError(`Untrusted Pixiv CDN image URL: "${imageUrl}"`);
     }
 
-    const response = await this.fetchFn(imageUrl, {
+    const response = await this.request(imageUrl, {
       method: 'GET',
       headers: this.getHeaders({
         Referer: this.referer,
@@ -197,8 +296,14 @@ export class PixivClient {
       signal,
     });
 
+    if (response.status === 429) {
+      throw new PixivRateLimitError();
+    }
+    if (response.status === 403) {
+      throw new PixivAuthError();
+    }
     if (!response.ok) {
-      throw new Error(`Failed to fetch image ${imageUrl}: HTTP ${response.status}`);
+      throw new PixivApiError(`Failed to fetch image ${imageUrl}: HTTP ${response.status}`, response.status);
     }
 
     const data = await response.arrayBuffer();
@@ -209,13 +314,14 @@ export class PixivClient {
 
   /**
    * Concurrently downloads all pages of an artwork and packages them into a ZIP archive.
+   * Dynamically loads JSZip on demand to keep the base package footprint lightweight.
    */
   async downloadZip(
     artwork: ArtworkData,
     options: DownloadZipOptions = {}
   ): Promise<{ data: Uint8Array; filename: string }> {
     if (!artwork.pages || artwork.pages.length === 0) {
-      throw new Error('Artwork contains no downloadable pages');
+      throw new PixivDownloadError('Artwork contains no downloadable pages');
     }
 
     const concurrency = Math.max(1, options.concurrency ?? 3);
@@ -239,7 +345,7 @@ export class PixivClient {
     const worker = async () => {
       while (queue.length > 0) {
         if (signal?.aborted) {
-          throw new Error('Download aborted by user');
+          throw new PixivDownloadError('Download aborted by user');
         }
 
         const item = queue.shift();
@@ -267,6 +373,10 @@ export class PixivClient {
 
     // Build ZIP
     report('compressing', 0, 100);
+    
+    // Dynamic import of jszip to keep standard client bundle lean
+    const JSZipModule = await import('jszip');
+    const JSZip = (JSZipModule.default || JSZipModule) as any;
     const zip = new JSZip();
     const safeTitle = sanitizeFilename(artwork.title);
 
@@ -284,7 +394,7 @@ export class PixivClient {
         compression: 'DEFLATE',
         compressionOptions: { level: 6 },
       },
-      (metadata) => {
+      (metadata: { percent: number }) => {
         report('compressing', Math.round(metadata.percent), 100);
       }
     );
