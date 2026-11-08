@@ -148,10 +148,10 @@ export class PixivClient {
     if (pages.length === 0 && body.urls) {
       pages.push({
         urls: {
-          thumb_mini: body.urls.mini,
-          small: body.urls.small,
-          regular: body.urls.regular,
-          original: body.urls.original,
+          thumb_mini: body.urls.mini || '',
+          small: body.urls.small || '',
+          regular: body.urls.regular || '',
+          original: body.urls.original || '',
         },
         width: body.width,
         height: body.height,

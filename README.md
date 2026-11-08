@@ -1,4 +1,4 @@
-# pixivjs
+# @krpkg/pixivjs
 
 Lightweight, universal TypeScript client and SDK for fetching Pixiv artwork metadata and downloading artworks with ZIP archiving support.
 
@@ -6,36 +6,36 @@ Designed with zero platform-specific dependencies, fully compatible with Node.js
 
 ## Features
 
-- Artwork ID Resolver: Supports raw numeric IDs, full desktop URLs, language-localized URLs (`/en/artworks/...`), query parameter URLs (`illust_id=...`), and mobile shared links.
-- Resilient Fallback: Automatically cascades through Pixiv's desktop AJAX API, desktop page details, and mobile touch fallback (ensures R-18 and restricted works resolve properly).
-- Domain & CDN Verification: Includes `isPixivCdnUrl()` to validate URLs from `i.pximg.net` and `pixiv.net`.
-- In-Memory ZIP Packaging: Concurrent image downloading with configurable concurrency and real-time progress callbacks using JSZip.
-- Customizable Network Layer: Accepts custom `fetch` implementations, user agents, cookies (such as `PHPSESSID`), and referer headers.
+- **Artwork ID Resolver**: Supports raw numeric IDs, full desktop URLs, language-localized URLs (`/en/artworks/...`), query parameter URLs (`illust_id=...`), and mobile shared links.
+- **Resilient Fallback**: Automatically cascades through Pixiv's desktop AJAX API, desktop page details, and mobile touch fallback (ensures R-18 and restricted works resolve properly).
+- **Domain & CDN Verification**: Includes `isPixivCdnUrl()` to validate URLs from `i.pximg.net` and `pixiv.net`.
+- **In-Memory ZIP Packaging**: Concurrent image downloading with configurable concurrency and real-time progress callbacks using JSZip.
+- **Customizable Network Layer**: Accepts custom `fetch` implementations, user agents, cookies (such as `PHPSESSID`), and referer headers.
 
 ## Installation
 
-Using krpkg CLI:
+Using npm:
 
 ```bash
-krpkg install pixivjs
+npm install @krpkg/pixivjs
 ```
 
 Using Bun:
 
 ```bash
-bun add github:krpkg/pixivjs
+bun add @krpkg/pixivjs
 ```
 
-Using npm:
+Using pnpm:
 
 ```bash
-npm install github:krpkg/pixivjs
+pnpm add @krpkg/pixivjs
 ```
 
 ## Quick Start
 
 ```typescript
-import { PixivClient } from 'pixivjs';
+import { PixivClient } from '@krpkg/pixivjs';
 
 const client = new PixivClient({
   // Optional custom cookie for R-18 / member-only access
